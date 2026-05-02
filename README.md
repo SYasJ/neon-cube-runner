@@ -1,7 +1,7 @@
 # Neon Cube Runner 🌟
 
 A fast-paced 3D tunnel racing game built with HTML5 Canvas and JavaScript. Dodge obstacles, collect power-ups, and survive as long as you can in this neon-lit cyberpunk world!
-
+[Gameplay Screenshot](https://Action.png)
 *Visual: 3D tunnel with neon obstacles*
 
 *Easy keyboard controls*
