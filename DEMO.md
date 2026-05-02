@@ -28,7 +28,7 @@ Open `index.html` in Chrome, Firefox, Safari, or Edge. Click **"▶ START GAME"*
 │  [Background: Space + stars]      │
 │  [Tunnel: scrolling 3D walls]     │
 │                                   │
-│  [Cyan Player]  💎  🔴    💎       │
+│  [Cyan Player]  💎  🔴    💎     │
 │      (Orbs)   (Obstacle)  (Orb)   │
 │                                   │
 │ Speed: [████░░░░] 6.5  Lv: 5      │
@@ -38,13 +38,13 @@ Open `index.html` in Chrome, Firefox, Safari, or Edge. Click **"▶ START GAME"*
 ### Combo Active
 ```
 ┌───────────────────────────────────┐
-│ Score: 3500        Best: 5000      │
-│ COMBO x5!        (big yellow)      │
-│              💫🌟✨💫🌟             │
+│ Score: 3500        Best: 5000     │
+│ COMBO x5!        (big yellow)     │
+│              💫🌟✨💫🌟          |
 │                                   │
-│  Rapid orb collection              │
-│  💎💎💎💎💎💎 collecting fast!      │
-│  Yellow explosions 💥💥💥          │
+│  Rapid orb collection             │
+│  💎💎💎💎💎💎 collecting fast!  │
+│  Yellow explosions 💥💥💥        │
 │                                   │
 │ Speed: [████████░░] 8.5  Lv: 7    │
 └───────────────────────────────────┘
