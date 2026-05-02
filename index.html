@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Neon Cube Runner - 3D Arcade Game</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{overflow:hidden;background:#0f0f23;font-family:Arial,sans-serif;color:#fff}
+#game{display:block;width:100vw;height:100vh}
+#ui{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:10}
+#sc{position:absolute;top:20px;left:20px;font-size:28px;font-weight:bold;color:#00ffff;text-shadow:0 0 10px rgba(0,255,255,.8)}
+#hs{position:absolute;top:20px;right:20px;font-size:18px;color:#ff00ff}
+#cb{position:absolute;top:60px;left:20px;font-size:20px;color:#ffff00;opacity:0;transition:opacity .3s,transform .3s}
+#lives{position:absolute;top:20px;left:50%;transform:translateX(-50%);font-size:22px;color:#ff4444;text-shadow:0 0 10px rgba(255,0,0,.5)}
+#menu{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;pointer-events:all;z-index:20}
+#title{font-size:42px;font-weight:bold;color:#fff;text-shadow:0 0 10px #00ffff,0 0 20px #00ffff;margin-bottom:20px}
+#startBtn{padding:15px 40px;font-size:24px;font-weight:bold;color:#00ffff;background:linear-gradient(135deg,#1a1a3a,#2a2a5a);border:3px solid #00ffff;border-radius:15px;cursor:pointer;transition:all .3s}
+#startBtn:hover{background:linear-gradient(135deg,#2a2a5a,#3a3a7a);box-shadow:0 0 20px rgba(0,255,255,.8);transform:scale(1.05)}
+#gameOver{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;pointer-events:all;z-index:20;opacity:0;transition:opacity .5s}
+#finalScore{font-size:32px;color:#ffff00;margin:20px 0}
+#restartBtn{padding:15px 40px;font-size:20px;font-weight:bold;color:#00ff00;background:linear-gradient(135deg,#1a3a1a,#2a5a2a);border:3px solid #00ff00;border-radius:15px;cursor:pointer;margin-top:20px}
+.info{position:absolute;bottom:20px;left:50%;transform:translateX(-50%);font-size:14px;color:#888;text-align:center}
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+<div id="ui">
+<div id="sc">0</div>
+<div id="hs">Best: 0</div>
+<div id="lives">♥♥♥</div>
+<div id="cb">COMBO x0!</div>
+<div id="menu">
+<div id="title">NEON CUBE RUNNER</div>
+<div style="color:#888;margin-bottom:30px;font-size:16px">3D Tunnel Runner</div>
+<button id="startBtn">▶ START GAME</button>
+</div>
+<div id="gameOver">
+<div style="font-size:36px;color:#ff4444;margin-bottom:20px">GAME OVER</div>
+<div id="finalScore">Score: 0</div>
+<div id="stats" style="color:#888;font-size:18px"></div>
+<button id="restartBtn">↻ PLAY AGAIN</button>
+</div>
+<div class="info">← → or A/D to move | SPACE to pause</div>
+</div>
+<script>
+var canvas=document.getElementById('game');
+var ctx=canvas.getContext('2d');
+var W=canvas.width=window.innerWidth;
+var H=canvas.height=window.innerHeight;
+window.addEventListener('resize',function(){W=canvas.width=window.innerWidth;H=canvas.height=window.innerHeight;});
+
+var gameState='menu';
+var score=0;
+var highScore=parseInt(localStorage.getItem('nchr'))||0;
+var speed=3;
+var baseSpeed=3;
+var combo=0;
+var maxCombo=0;
+var comboTimer=0;
+var gameTime=0;
+var level=1;
+var lives=3;
+var player={x:0,y:H*0.75,w:40,h:40,speed:8,color:'#00ffff'};
+var obstacles=[];
+var collectibles=[];
+var particles=[];
+var tunnelSegments=[];
+var keys={};
+var mouseX=W/2;
+var lastPlayerX=W/2;
+
+document.getElementById('hs').textContent='Best: '+highScore;
+
+function initTunnel(){
+tunnelSegments=[];
+var segCount=Math.ceil(H/40)+5;
+for(var i=0;i<segCount;i++){
+tunnelSegments.push({y:-i*60,w:W,h:60});
+}
+}
+initTunnel();
+
+function resizeWorld(){
+player.y=H*0.75;
+}
+
+function createObstacle(){
+var types=[{w:60,h:40,c:'#ff4444'},{w:100,h:40,c:'#ff6600'},{w:140,h:40,c:'#cc0000'}];
+var type=types[Math.floor(Math.random()*types.length)];
+return{x:Math.random()*(W-type.w),y:-type.h,w:type.w,h:type.h,c:type.c,r:Math.random()*Math.PI*2};
+}
+
+function createCollectible(){
+var colors=['#ffff00','#00ff00','#ff00ff','#00ffff'];
+return{x:Math.random()*(W-30),y:-30,w:30,h:30,c:colors[Math.floor(Math.random()*4)],r:0,p:Math.random()*Math.PI*2};
+}
+
+function createParticles(x,y,c,n){
+for(var i=0;i<n;i++){
+particles.push({x:x,y:y,vx:(Math.random()-.5)*10,vy:(Math.random()-.5)*10,l:1,dc:.02+Math.random()*.02,cl:c,s:Math.random()*5+2});
+}
+}
+
+function checkCollision(r1,r2){
+return r1.x<r2.x+r2.w&&r1.x+r1.w>r2.x&&r1.y<r2.y+r2.h&&r1.y+r1.h>r2.y;
+}
+
+function shadeColor(col,p){
+var R=parseInt(col.substr(1,2),16);
+var G=parseInt(col.substr(3,2),16);
+var B=parseInt(col.substr(5,2),16);
+R=Math.min(255,Math.max(0,R+R*p/100));
+G=Math.min(255,Math.max(0,G+G*p/100));
+B=Math.min(255,Math.max(0,B+B*p/100));
+return '#'+R.toString(16).padStart(2,'0')+G.toString(16).padStart(2,'0')+B.toString(16).padStart(2,'0');
+}
+
+function drawCube(x,y,w,h,c,r,d){
+ctx.save();
+ctx.translate(x+w/2,y+h/2);
+ctx.rotate(r);
+var ds=d*3;
+ctx.fillStyle=shadeColor(c,-30);
+ctx.fillRect(-w/2+ds,-h/2,w,h);
+ctx.fillStyle=c;
+ctx.fillRect(-w/2,-h/2,w-ds,h);
+ctx.shadowColor=c;
+ctx.shadowBlur=15;
+ctx.strokeStyle=c;
+ctx.lineWidth=2;
+ctx.strokeRect(-w/2,-h/2,w-ds,h);
+ctx.restore();
+}
+
+function drawTunnel(){
+tunnelSegments.forEach(function(seg){
+var p=1+seg.y/(H*2);
+var sw=W*p;
+var sh=seg.h*p;
+var x=(W-sw)/2;
+var ay=((seg.y+gameTime*speed)%(H+sh))-sh;
+var g=ctx.createLinearGradient(x,ay,x+sw,ay);
+g.addColorStop(0,'rgba(0,255,255,'+(0.1*p)+')');
+g.addColorStop(.5,'rgba(100,0,255,'+(0.15*p)+')');
+g.addColorStop(1,'rgba(255,0,255,'+(0.1*p)+')');
+ctx.fillStyle=g;
+ctx.fillRect(x,ay,sw,sh);
+ctx.strokeStyle='rgba(0,255,255,'+(0.3*p)+')';
+ctx.lineWidth=2;
+ctx.beginPath();
+ctx.moveTo(x,ay);
+ctx.lineTo(x+sw,ay);
+ctx.stroke();
+ctx.beginPath();
+ctx.moveTo(x,ay+sh);
+ctx.lineTo(x+sw,ay+sh);
+ctx.stroke();
+});
+}
+
+function update(){
+if(gameState!=='p')return;
+gameTime++;
+
+// Keyboard movement with persistence - no snap-back
+if(keys['ArrowLeft']||keys['a']||keys['A']){
+player.x-=player.speed;
+player.x=Math.max(player.w/2,Math.min(W-player.w/2,player.x));
+lastPlayerX=player.x;
+}else if(keys['ArrowRight']||keys['d']||keys['D']){
+player.x+=player.speed;
+player.x=Math.max(player.w/2,Math.min(W-player.w/2,player.x));
+lastPlayerX=player.x;
+}else{
+// Use last known position, not mouse, when no keys pressed
+player.x=lastPlayerX;
+}
+
+if(gameTime%600===0){speed+=.5;level++;}
+if(comboTimer>0){comboTimer--;if(comboTimer===0){combo=0;updateComboDisplay();}}
+if(Math.random()<.015+speed*.005)obstacles.push(createObstacle());
+if(Math.random()<.01)collectibles.push(createCollectible());
+tunnelSegments.forEach(function(s){s.y+=speed;});
+
+obstacles.forEach(function(o,i){
+o.y+=speed;o.r+=.05;
+if(checkCollision(player,o)){loseLife();obstacles.splice(i,1);}
+if(o.y>H+50)obstacles.splice(i,1);
+});
+collectibles.forEach(function(c,i){
+c.y+=speed;c.r+=.1;c.p+=.1;
+if(checkCollision(player,c)){
+score+=100*(combo+1);combo++;comboTimer=120;
+maxCombo=Math.max(maxCombo,combo);
+updateScore();updateComboDisplay();
+createParticles(player.x,player.y,'#ffff00',15);
+collectibles.splice(i,1);
+}else if(c.y>H+50)collectibles.splice(i,1);
+});
+particles.forEach(function(p,i){p.x+=p.vx;p.y+=p.vy;p.vy+=.1;p.l-=p.dc;if(p.l<=0)particles.splice(i,1);});
+}
+
+function loseLife(){
+lives--;
+createParticles(player.x,player.y,player.color,20);
+if(lives<=0){endGame();}else{respawn();}
+updateLivesDisplay();
+}
+
+function respawn(){
+player.x=W/2;
+// Brief invulnerability flash
+createParticles(player.x,player.y,'#00ffff',25);
+}
+
+function render(){
+ctx.clearRect(0,0,W,H);
+var cx=W/2,cy=H/2;
+var bg=ctx.createRadialGradient(cx,cy,0,cx,cy,Math.max(W,H)/2);
+bg.addColorStop(0,'#1a1a3a');bg.addColorStop(1,'#0f0f23');
+ctx.fillStyle=bg;ctx.fillRect(0,0,W,H);
+drawTunnel();
+obstacles.forEach(function(o){drawCube(o.x,o.y,o.w,o.h,o.c,o.r,1);});
+collectibles.forEach(function(c){
+c.r+=.1;c.p+=.1;var s=1+Math.sin(c.p)*.2;
+ctx.shadowColor=c.c;ctx.shadowBlur=20;
+var dw=c.w*s,dh=c.h*s;
+drawCube(c.x+c.w/2-dw/2,c.y+c.h/2-dh/2,dw,dh,c.c,c.r,1);
+ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(c.x+c.w/2,c.y+c.h/2,5,0,Math.PI*2);ctx.fill();ctx.shadowBlur=0;
+});
+particles.forEach(function(p){ctx.globalAlpha=p.l;ctx.fillStyle=p.cl;ctx.shadowColor=p.cl;ctx.shadowBlur=10;
+ctx.beginPath();ctx.arc(p.x,p.y,p.s,0,Math.PI*2);ctx.fill();});
+ctx.globalAlpha=1;
+if(gameState==='p')drawCube(player.x-player.w/2,player.y-player.h/2,player.w,player.h,player.color,gameTime*.1,2);
+var ssp=Math.min(100,(speed-baseSpeed)/5*100);
+ctx.fillStyle='rgba(255,255,255,.1)';ctx.fillRect(20,H-40,200,10);
+ctx.fillStyle='#00ffff';ctx.fillRect(20,H-40,200*ssp/100,10);
+ctx.fillStyle='#888';ctx.font='10px Arial';ctx.fillText('SPEED',20,H-50);
+ctx.fillStyle='#ff00ff';ctx.font='bold 14px Arial';ctx.fillText('LEVEL '+level,W-70,H-45);
+}
+
+function updateScore(){document.getElementById('sc').textContent=score;if(score>highScore){highScore=score;localStorage.setItem('nchr',highScore);document.getElementById('hs').textContent='Best: '+highScore;}}
+function updateLivesDisplay(){var hearts='';for(var i=0;i<lives;i++)hearts+='♥';for(var i=lives;i<3;i++)hearts+='♡';document.getElementById('lives').textContent=hearts;}
+function updateComboDisplay(){var el=document.getElementById('cb');if(combo>1){el.textContent='COMBO x'+combo+'!';el.style.opacity='1';el.style.transform='scale('+(1+combo*.1)+')';}else{el.style.opacity='0';el.style.transform='scale(1)';}}
+
+function startGame(){gameState='p';score=0;speed=baseSpeed;combo=0;comboTimer=0;maxCombo=0;gameTime=0;level=1;lives=3;obstacles=[];collectibles=[];particles=[];player.x=W/2;lastPlayerX=W/2;updateLivesDisplay();document.getElementById('menu').style.display='none';document.getElementById('gameOver').style.display='none';document.getElementById('gameOver').style.opacity='0';updateScore();updateComboDisplay();}
+
+function endGame(){gameState='over';createParticles(player.x,player.y,player.color,30);createParticles(player.x,player.y,'#ff4444',20);setTimeout(function(){document.getElementById('gameOver').style.display='block';document.getElementById('finalScore').textContent='Score: '+score;document.getElementById('stats').textContent='Best Combo: x'+maxCombo+' | Level: '+level;document.getElementById('gameOver').style.opacity='1';},1000);}
+
+function pauseGame(){if(gameState==='p'){gameState='ps';document.getElementById('menu').style.display='block';document.getElementById('title').textContent='PAUSED';document.getElementById('menu').querySelector('button').style.display='none';}else if(gameState==='ps'){gameState='p';document.getElementById('menu').style.display='none';document.getElementById('menu').querySelector('button').style.display='';}}
+
+document.getElementById('startBtn').addEventListener('click',startGame);
+document.getElementById('restartBtn').addEventListener('click',function(){gameState='menu';score=0;speed=baseSpeed;combo=0;comboTimer=0;maxCombo=0;gameTime=0;level=1;lives=3;obstacles=[];collectibles=[];particles=[];player.x=W/2;lastPlayerX=W/2;initTunnel();updateLivesDisplay();updateScore();updateComboDisplay();document.getElementById('menu').style.display='block';document.getElementById('gameOver').style.display='none';document.getElementById('gameOver').style.opacity='0';});
+document.addEventListener('keydown',function(e){keys[e.key]=true;if(e.key===' '||e.key==='Spacebar'){e.preventDefault();if(gameState==='p'||gameState==='ps')pauseGame();else if(gameState==='menu')startGame();}});
+document.addEventListener('keyup',function(e){keys[e.key]=false;});
+canvas.addEventListener('mousemove',function(e){mouseX=e.clientX;});
+canvas.addEventListener('touchmove',function(e){e.preventDefault();mouseX=e.touches[0].clientX;},{passive:false});
+function loop(){update();render();requestAnimationFrame(loop);}loop();
+</script>
+</body>
+</html>
